@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三人炸飞机 - 微信邀请版</title>
+    <style>
+        /* 基础样式 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 { 
+            color: #4a5568; 
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        /* 界面切换 */
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        /* 按钮样式 */
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            background: #4299e1;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            text-align: center;
+        }
+        .btn:hover { background: #3182ce; }
+        .btn-success { background: #48bb78; }
+        .btn-success:hover { background: #38a169; }
+        
+        /* 房间界面 */
+        .room-info {
+            background: #e6fffa;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .room-id {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2d3748;
+            margin: 10px 0;
+        }
+        .qr-container {
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            display: inline-block;
+        }
+        .share-link {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            word-break: break-all;
+            border: 2px dashed #cbd5e0;
+        }
+        
+        /* 玩家列表 */
+        .players-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .player-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .player-item.ready {
+            background: #f0fff4;
+            border-left: 5px solid #48bb78;
+        }
+        .player-badge {
+            padding: 5px 15px;
+            background: #4299e1;
+            color: white;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        
+        /* 游戏界面 */
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 3px;
+            margin: 20px 0;
+        }
+        .grid-cell {
+            aspect-ratio: 1;
+            background: #edf2f7;
+            border: 1px solid #cbd5e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .grid-cell:hover { background: #e2e8f0; }
+        .grid-cell.hit { background: #fc8181; color: white; }
+        .grid-cell.miss { background: #90cdf4; color: white; }
+        
+        /* 微信分享 */
+        .wechat-tips {
+            background: #fff3cd;
+            border-left: 5px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        .step {
+            margin: 10px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        .step:before {
+            content: '➡️';
+            position: absolute;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 主菜单 -->
+        <div id="screen-menu" class="screen active">
+            <h1>🎮 三人炸飞机</h1>
+            <button class="btn" onclick="showScreen('create')">创建房间</button>
+            <button class="btn" onclick="showScreen('join')">加入房间</button>
+            <button class="btn" onclick="showScreen('help')">游戏说明</button>
+        </div>
+        
+        <!-- 创建房间 -->
+        <div id="screen-create" class="screen">
+            <h1>创建房间</h1>
+            <input type="text" id="playerName" placeholder="你的名字" class="btn" style="background: #f7fafc; color: #333;">
+            <button class="btn btn-success" onclick="createRoom()">创建游戏房间</button>
+            <button class="btn" onclick="showScreen('menu')">返回</button>
+        </div>
+        
+        <!-- 加入房间 -->
+        <div id="screen-join" class="screen">
+            <h1>加入房间</h1>
+            <input type="text" id="joinName" placeholder="你的名字" class="btn" style="background: #f7fafc; color: #333;">
+            <input type="text" id="roomCode" placeholder="输入6位房间码" class="btn" style="background: #f7fafc; color: #333;">
+            <button class="btn btn-success" onclick="joinRoom()">加入房间</button>
+            <button class="btn" onclick="showScreen('menu')">返回</button>
+        </div>
+        
+        <!-- 房间等待 -->
+        <div id="screen-room" class="screen">
+            <div class="room-info">
+                <h2>房间号</h2>
+                <div class="room-id" id="roomIdDisplay">---</div>
+                <p>等待玩家加入 (1/3)</p>
+                
+                <div class="qr-container">
+                    <canvas id="qrcode"></canvas>
+                </div>
+                
+                <div class="share-link" id="shareLink">链接生成中...</div>
+                <button class="btn" onclick="copyLink()">📋 复制链接</button>
+                
+                <div class="players-list" id="playersList"></div>
+                
+                <button class="btn btn-success" id="readyBtn" onclick="toggleReady()">准备</button>
+                <button class="btn" onclick="leaveRoom()">离开房间</button>
+            </div>
+            
+            <div class="wechat-tips">
+                <h3>📱 微信邀请好友：</h3>
+                <div class="step">1. 复制上方链接</div>
+                <div class="step">2. 粘贴到微信发送给好友</div>
+                <div class="step">3. 好友点击链接自动加入</div>
+                <div class="step">4. 满3人自动开始游戏</div>
+            </div>
+        </div>
+        
+        <!-- 游戏界面 -->
+        <div id="screen-game" class="screen">
+            <h2 id="gameStatus">游戏进行中...</h2>
+            <div id="gameBoards"></div>
+            <button class="btn" onclick="leaveGame()">退出游戏</button>
+        </div>
+        
+        <!-- 帮助 -->
+        <div id="screen-help" class="screen">
+            <h1>游戏说明</h1>
+            <div class="room-info">
+                <h3>🎯 游戏目标</h3>
+                <p>击落其他玩家的所有飞机，成为最后幸存者</p>
+                
+                <h3>👥 游戏规则</h3>
+                <p>1. 每个玩家有3架飞机</p>
+                <p>2. 飞机占据5个格子（机头1个，机翼机尾各2个）</p>
+                <p>3. 轮流攻击其他玩家的格子</p>
+                <p>4. 率先击落所有飞机者获胜</p>
+                
+                <h3>📱 微信邀请</h3>
+                <p>1. 创建房间后获取链接</p>
+                <p>2. 在微信中发送给2位好友</p>
+                <p>3. 好友点击链接自动加入</p>
+            </div>
+            <button class="btn" onclick="showScreen('menu')">返回</button>
+        </div>
+    </div>
+
+    <!-- Socket.io 客户端 -->
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <script>
+        // ==================== 游戏核心逻辑 ====================
+        let socket = null;
+        let roomId = null;
+        let playerNum = null;
+        let players = [];
+        let isReady = false;
+        
+        // 初始化Socket连接
+        function initSocket() {
+            // 连接到本地服务器
+            socket = io('http://localhost:3000');
+            
+            socket.on('connect', () => {
+                console.log('已连接到服务器');
+            });
+            
+            socket.on('room-created', (data) => {
+                roomId = data.roomId;
+                playerNum = data.playerNum;
+                players = data.players;
+                
+                document.getElementById('roomIdDisplay').textContent = roomId;
+                document.getElementById('shareLink').textContent = data.roomUrl;
+                updatePlayersList();
+                
+                // 显示二维码
+                if (data.qrCode) {
+                    const img = document.createElement('img');
+                    img.src = data.qrCode;
+                    img.width = 200;
+                    document.getElementById('qrcode').innerHTML = '';
+                    document.getElementById('qrcode').appendChild(img);
+                }
+                
+                showScreen('room');
+            });
+            
+            socket.on('room-joined', (data) => {
+                roomId = data.roomId;
+                playerNum = data.playerNum;
+                players = data.players;
+                
+                document.getElementById('roomIdDisplay').textContent = roomId;
+                updatePlayersList();
+                showScreen('room');
+            });
+            
+            socket.on('player-joined', (data) => {
+                players = data.players;
+                updatePlayersList();
+            });
+            
+            socket.on('player-ready-changed', (data) => {
+                players = data.players;
+                updatePlayersList();
+                
+                // 更新按钮状态
+                const btn = document.getElementById('readyBtn');
+                const myPlayer = players.find(p => p.playerNum === playerNum);
+                if (myPlayer && myPlayer.ready) {
+                    btn.textContent = '已准备';
+                    btn.style.background = '#48bb78';
+                }
+            });
+            
+            socket.on('game-started', (data) => {
+                startGame(data);
+            });
+            
+            socket.on('error', (message) => {
+                alert('错误: ' + message);
+            });
+        }
+        
+        // 创建房间
+        function createRoom() {
+            const playerName = document.getElementById('playerName').value || '玩家';
+            if (!socket) initSocket();
+            
+            socket.emit('create-room', {
+                playerName: playerName
+            });
+        }
+        
+        // 加入房间
+        function joinRoom() {
+            const playerName = document.getElementById('joinName').value || '玩家';
+            const roomCode = document.getElementById('roomCode').value.toUpperCase();
+            
+            if (!roomCode || roomCode.length !== 6) {
+                alert('请输入6位房间码');
+                return;
+            }
+            
+            if (!socket) initSocket();
+            
+            socket.emit('join-room', {
+                roomId: roomCode,
+                playerName: playerName
+            });
+        }
+        
+        // 准备/取消准备
+        function toggleReady() {
+            if (!socket || !roomId) return;
+            
+            socket.emit('player-ready', {
+                roomId: roomId
+            });
+        }
+        
+        // 更新玩家列表
+        function updatePlayersList() {
+            const list = document.getElementById('playersList');
+            list.innerHTML = '';
+            
+            players.forEach(player => {
+                const div = document.createElement('div');
+                div.className = `player-item ${player.ready ? 'ready' : ''}`;
+                div.innerHTML = `
+                    <div>
+                        <strong>${player.name}</strong>
+                        ${player.id === socket.id ? '(你)' : ''}
+                    </div>
+                    <div class="player-badge">
+                        玩家${player.playerNum}
+                        ${player.ready ? ' ✓' : ' ...'}
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+            
+            // 更新等待信息
+            const info = document.querySelector('.room-info p');
+            if (info) {
+                info.textContent = `等待玩家加入 (${players.length}/3)`;
+            }
+        }
+        
+        // 复制链接
+        function copyLink() {
+            const link = document.getElementById('shareLink').textContent;
+            navigator.clipboard.writeText(link).then(() => {
+                alert('链接已复制！\n\n粘贴到微信发送给好友即可邀请。');
+            });
+        }
+        
+        // 开始游戏
+        function startGame(data) {
+            showScreen('game');
+            initGameBoard(data);
+        }
+        
+        // 初始化游戏板
+        function initGameBoard(data) {
+            const boards = document.getElementById('gameBoards');
+            boards.innerHTML = '';
+            
+            // 创建3个玩家的游戏板
+            for (let i = 1; i <= 3; i++) {
+                const board = document.createElement('div');
+                board.className = 'player-board';
+                board.innerHTML = `
+                    <h3>玩家${i} ${i === playerNum ? '(你)' : ''}</h3>
+                    <div class="game-grid" id="grid-${i}"></div>
+                `;
+                boards.appendChild(board);
+                
+                // 创建10x10网格
+                const grid = document.getElementById(`grid-${i}`);
+                for (let row = 1; row <= 10; row++) {
+                    for (let col = 1; col <= 10; col++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'grid-cell';
+                        cell.dataset.row = row;
+                        cell.dataset.col = col;
+                        cell.dataset.player = i;
+                        
+                        if (i !== playerNum) {
+                            cell.onclick = () => attackPlayer(i, row, col);
+                        }
+                        
+                        grid.appendChild(cell);
+                    }
+                }
+            }
+        }
+        
+        // 攻击玩家
+        function attackPlayer(targetPlayer, row, col) {
+            if (!socket || !roomId) return;
+            
+            socket.emit('attack', {
+                roomId: roomId,
+                targetPlayer: targetPlayer,
+                row: row,
+                col: col,
+                playerNum: playerNum
+            });
+        }
+        
+        // 界面切换
+        function showScreen(screenName) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(`screen-${screenName}`).classList.add('active');
+        }
+        
+        // 离开房间
+        function leaveRoom() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+            roomId = null;
+            playerNum = null;
+            players = [];
+            showScreen('menu');
+        }
+        
+        // 离开游戏
+        function leaveGame() {
+            leaveRoom();
+        }
+        
+        // 页面加载
+        window.addEventListener('DOMContentLoaded', () => {
+            // 检查URL中是否有房间号
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomParam = urlParams.get('room');
+            
+            if (roomParam) {
+                document.getElementById('roomCode').value = roomParam;
+                showScreen('join');
+            }
+        });
+    </script>
+</body>
+</html>
